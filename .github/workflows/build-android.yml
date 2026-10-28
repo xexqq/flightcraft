@@ -55,7 +55,7 @@ jobs:
       - name: Configure Godot and debug key
         run: |
           mkdir -p "$HOME/.config/godot" "$HOME/.android"
-          printf '[gd_resource type="EditorSettings" format=3]\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' "$ANDROID_HOME" "$JAVA_HOME" > "$HOME/.config/godot/editor_settings-4.tres"
+
           keytool -genkeypair \
             -keystore "$HOME/.android/debug.keystore" \
             -storepass android \
@@ -66,6 +66,19 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
 
+          cat > "$HOME/.config/godot/editor_settings-4.4.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_password = "android"
+          EOF
+
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+       
       - name: Prepare output directory
         run: mkdir -p build
 
