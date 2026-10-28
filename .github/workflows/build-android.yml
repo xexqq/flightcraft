@@ -96,7 +96,7 @@ jobs:
           echo "=== Godot templates ==="
           ls -la "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
           echo "=== Godot editor settings ==="
-          cat "$HOME/.config/godot/editor_settings-4.tres"
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
           echo "=== Export preset ==="
           cat export_presets.cfg
 
