@@ -1,32 +1,76 @@
+
 name: Build Android APK
+
 on:
   workflow_dispatch:
   push:
     branches: ["main", "master"]
-    paths:
-      - "**.gd"
-      - "**.tscn"
-      - "**.tres"
-      - "**.gdshader"
-      - "project.godot"
-      - "export_presets.cfg"
-      - ".github/workflows/build-android.yml"
 
 jobs:
   export:
     runs-on: ubuntu-latest
     container:
       image: barichello/godot-ci:4.4.1
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-33" "platforms;android-34" "build-tools;33.0.2" "build-tools;34.0.0"
+
+      - name: Install Godot export templates
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.4.1.stable"
+          curl -fL --retry 3 \
+            "https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" \
+            -o /tmp/templates.tpz
+          mkdir -p /tmp/godot-templates
+          unzip -q /tmp/templates.tpz -d /tmp/godot-templates
+          cp /tmp/godot-templates/templates/* \
+            "$HOME/.local/share/godot/export_templates/4.4.1.stable/"
+          test -f "$HOME/.local/share/godot/export_templates/4.4.1.stable/android_debug.apk"
+          test -f "$HOME/.local/share/godot/export_templates/4.4.1.stable/android_release.apk"
+
+      - name: Configure Godot and debug key
+        run: |
+          mkdir -p "$HOME/.config/godot" "$HOME/.android"
+          printf '[gd_resource type="EditorSettings" format=3]\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' "$ANDROID_HOME" "$JAVA_HOME" > "$HOME/.config/godot/editor_settings-4.tres"
+          keytool -genkeypair \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Prepare output directory
         run: mkdir -p build
-      - name: Import project resources
+
+      - name: Import project
         run: godot --headless --editor --path . --quit
+
       - name: Export Android APK
-        run: godot --headless --path . --export-debug "Android" build/Flightcraft.apk
-      - name: Upload APK artifact
+        run: |
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$HOME/.android/debug.keystore"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER="androiddebugkey"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD="android"
+          godot --headless --path . --export-debug "Android" build/Flightcraft.apk
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Flightcraft-Android-debug
